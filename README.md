@@ -53,6 +53,9 @@ A aplicação permite gerar arquivos de diferentes extensões e tamanhos de form
 ## 📸 Interface
 
 A aplicação possui uma interface gráfica desenvolvida em Tkinter, com capa personalizada, painel de configuração e atalhos para os perfis profissionais da autora.
+<img width="1128" height="864" alt="image" src="https://github.com/user-attachments/assets/37e21135-0737-4fea-85d0-2890992c0dbc" />
+<img width="1122" height="847" alt="image" src="https://github.com/user-attachments/assets/445add7b-cedb-4d04-890b-4e30b0234e9f" />
+
 
 ---
 
@@ -73,7 +76,7 @@ Não é necessário instalar Python para utilizar a versão executável.
 ### 1. Clonar o projeto
 
 ```bash
-git clone <URL_DO_REPOSITORIO>
+git clone https://github.com/ericasouzaqa/GeradorArquivosTeste.git
 cd GeradorArquivosTeste
 ```
 
