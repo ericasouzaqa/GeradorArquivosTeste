@@ -4,6 +4,22 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import webbrowser
 
+
+# ============================================================
+# PILLOW
+# ============================================================
+
+try:
+    from PIL import Image, ImageDraw, ImageFont
+    PIL_DISPONIVEL = True
+except ImportError:
+    PIL_DISPONIVEL = False
+
+
+# ============================================================
+# ESTILO
+# ============================================================
+
 from estilo import (
     configurar_estilo,
     aplicar_icone,
@@ -15,14 +31,6 @@ from estilo import (
     COR_BORDA,
     FONTE_SUBTITULO,
 )
-
-try:
-    from PIL import Image, ImageDraw, ImageFont
-
-    PIL_DISPONIVEL = True
-
-except ImportError:
-    PIL_DISPONIVEL = False
 
 
 # ============================================================
@@ -45,11 +53,42 @@ UNIDADES = [
     "GB",
 ]
 
+# Blocos de 1 MB usados na gravação.
 TAMANHO_BLOCO = 1024 * 1024
-LIMITE_MAXIMO = 10 * (1024 ** 3)
 
-GITHUB_URL = "https://github.com/ericasouzaqa"
-LINKEDIN_URL = "https://www.linkedin.com/in/erica-souza/"
+GITHUB_URL = (
+    "https://github.com/ericasouzaqa/GeradorArquivosTeste"
+)
+
+LINKEDIN_URL = (
+    "https://www.linkedin.com/in/erica-souza/"
+)
+
+
+# ============================================================
+# DIRETÓRIO DA APLICAÇÃO
+# ============================================================
+
+def obter_diretorio_aplicacao():
+    if getattr(sys, "frozen", False):
+        return os.path.dirname(sys.executable)
+
+    return os.path.dirname(
+        os.path.abspath(__file__)
+    )
+
+
+DIRETORIO_APLICACAO = obter_diretorio_aplicacao()
+
+CAMINHO_CAPA = os.path.join(
+    DIRETORIO_APLICACAO,
+    "capa.png"
+)
+
+CAMINHO_ICONE = os.path.join(
+    DIRETORIO_APLICACAO,
+    "icone.ico"
+)
 
 
 # ============================================================
@@ -71,112 +110,178 @@ fundo_canvas = None
 
 
 # ============================================================
-# ÍCONE DO WINDOWS
-# ============================================================
-
-def configurar_icone_windows():
-    """
-    Configura o identificador do aplicativo no Windows
-    para melhorar a identificação na barra de tarefas.
-    """
-
-    if sys.platform == "win32":
-        try:
-            import ctypes
-
-            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
-                "EricaSouza.GeradorArquivosTeste"
-            )
-
-        except Exception:
-            pass
-
-    try:
-        aplicar_icone(janela)
-
-    except Exception:
-        pass
-
-
-# ============================================================
-# UTILITÁRIOS
+# CONVERSÃO DE TAMANHO
 # ============================================================
 
 def converter_para_bytes(tamanho, unidade):
+    """
+    Converte o valor informado para bytes.
+
+    1 KB = 1024 bytes
+    1 MB = 1024² bytes
+    1 GB = 1024³ bytes
+
+    Não existe limite máximo artificial.
+    """
+
     multiplicadores = {
         "KB": 1024,
         "MB": 1024 ** 2,
         "GB": 1024 ** 3,
     }
 
+    unidade = unidade.upper().strip()
+
+    if unidade not in multiplicadores:
+        raise ValueError(
+            f"Unidade inválida: {unidade}"
+        )
+
     return int(
         tamanho * multiplicadores[unidade]
     )
 
 
+# ============================================================
+# FORMATAÇÃO
+# ============================================================
+
 def formatar_tamanho(bytes_total):
+    """
+    Formata bytes usando a maior unidade adequada.
+    """
+
     if bytes_total >= 1024 ** 3:
-        return f"{bytes_total / (1024 ** 3):.2f} GB"
+        return (
+            f"{bytes_total / (1024 ** 3):.2f} GB"
+        )
 
     if bytes_total >= 1024 ** 2:
-        return f"{bytes_total / (1024 ** 2):.2f} MB"
+        return (
+            f"{bytes_total / (1024 ** 2):.2f} MB"
+        )
 
-    return f"{bytes_total / 1024:.2f} KB"
+    if bytes_total >= 1024:
+        return (
+            f"{bytes_total / 1024:.2f} KB"
+        )
 
-
-def gerar_nome_base(extensao, tamanho, unidade):
-    return f"{extensao}{tamanho:g}{unidade}"
+    return f"{bytes_total} bytes"
 
 
 # ============================================================
-# NOME AUTOMÁTICO
+# FORMATAÇÃO NA UNIDADE ESCOLHIDA
+# ============================================================
+
+def formatar_tamanho_na_unidade(bytes_total, unidade):
+    """
+    Exibe o tamanho exatamente na unidade selecionada
+    pelo usuário.
+    """
+
+    unidade = unidade.upper().strip()
+
+    if unidade == "KB":
+        valor = bytes_total / (1024 ** 1)
+
+    elif unidade == "MB":
+        valor = bytes_total / (1024 ** 2)
+
+    elif unidade == "GB":
+        valor = bytes_total / (1024 ** 3)
+
+    else:
+        raise ValueError(
+            f"Unidade inválida: {unidade}"
+        )
+
+    return f"{valor:.2f} {unidade}"
+
+
+# ============================================================
+# NOME
+# ============================================================
+
+def gerar_nome_base(extensao, tamanho, unidade):
+    """
+    Gera o nome usando a unidade selecionada.
+    """
+
+    return (
+        f"{extensao}{tamanho:g}{unidade}"
+    )
+
+
+# ============================================================
+# ATUALIZAR NOME
 # ============================================================
 
 def atualizar_nome_arquivo(event=None):
     if gerar_todas.get():
-        campo_nome.configure(state="normal")
+        campo_nome.configure(
+            state="normal"
+        )
 
-        campo_nome.delete(0, tk.END)
+        campo_nome.delete(
+            0,
+            tk.END
+        )
 
         campo_nome.insert(
             0,
             "Gerado automaticamente para todas as extensões."
         )
 
-        campo_nome.configure(state="disabled")
+        campo_nome.configure(
+            state="disabled"
+        )
 
         return
 
-    extensao = combo_extensao.get()
-    unidade = combo_unidade.get()
+    extensao = combo_extensao.get().strip()
+    unidade = combo_unidade.get().strip()
     valor = campo_tamanho.get().strip()
 
     if not extensao or not unidade or not valor:
-        campo_nome.delete(0, tk.END)
+        campo_nome.delete(
+            0,
+            tk.END
+        )
         return
 
     try:
         tamanho = float(valor)
 
-        if tamanho <= 0:
-            campo_nome.delete(0, tk.END)
-            return
-
     except ValueError:
-        campo_nome.delete(0, tk.END)
+        campo_nome.delete(
+            0,
+            tk.END
+        )
         return
 
-    nome = gerar_nome_base(
+    if tamanho <= 0:
+        campo_nome.delete(
+            0,
+            tk.END
+        )
+        return
+
+    nome_base = gerar_nome_base(
         extensao,
         tamanho,
         unidade
     )
 
-    campo_nome.delete(0, tk.END)
+    nome = f"{nome_base}.{extensao}"
+
+    campo_nome.delete(
+        0,
+        tk.END
+    )
 
     campo_nome.insert(
         0,
-        f"{nome}.{extensao}"
+        nome
     )
 
 
@@ -185,6 +290,7 @@ def atualizar_nome_arquivo(event=None):
 # ============================================================
 
 def gerar_nome_unico(pasta, nome_arquivo):
+
     caminho = os.path.join(
         pasta,
         nome_arquivo
@@ -200,17 +306,70 @@ def gerar_nome_unico(pasta, nome_arquivo):
     contador = 1
 
     while True:
-        novo_nome = f"{nome}_{contador}{extensao}"
+
+        novo_nome = (
+            f"{nome}_{contador}{extensao}"
+        )
 
         novo_caminho = os.path.join(
             pasta,
             novo_nome
         )
 
-        if not os.path.exists(novo_caminho):
+        if not os.path.exists(
+            novo_caminho
+        ):
             return novo_caminho
 
         contador += 1
+
+
+# ============================================================
+# PREENCHER ATÉ O TAMANHO EXATO
+# ============================================================
+
+def completar_arquivo(caminho, tamanho_bytes):
+    """
+    Garante que o arquivo tenha exatamente
+    o número de bytes solicitado.
+    """
+
+    tamanho_atual = os.path.getsize(
+        caminho
+    )
+
+    if tamanho_atual > tamanho_bytes:
+        raise RuntimeError(
+            "O arquivo base é maior que o tamanho solicitado."
+        )
+
+    restante = (
+        tamanho_bytes -
+        tamanho_atual
+    )
+
+    if restante <= 0:
+        return
+
+    with open(
+        caminho,
+        "ab"
+    ) as arquivo:
+
+        while restante > 0:
+
+            tamanho_bloco = min(
+                TAMANHO_BLOCO,
+                restante
+            )
+
+            arquivo.write(
+                os.urandom(
+                    tamanho_bloco
+                )
+            )
+
+            restante -= tamanho_bloco
 
 
 # ============================================================
@@ -223,6 +382,7 @@ def criar_imagem_com_nome(
     extensao,
     tamanho_bytes
 ):
+
     if not PIL_DISPONIVEL:
         raise RuntimeError(
             "A biblioteca Pillow não está instalada."
@@ -233,11 +393,16 @@ def criar_imagem_com_nome(
 
     imagem = Image.new(
         "RGB",
-        (largura, altura),
+        (
+            largura,
+            altura
+        ),
         "white"
     )
 
-    desenho = ImageDraw.Draw(imagem)
+    desenho = ImageDraw.Draw(
+        imagem
+    )
 
     try:
         fonte = ImageFont.truetype(
@@ -254,41 +419,51 @@ def criar_imagem_com_nome(
         font=fonte
     )
 
-    largura_texto = caixa[2] - caixa[0]
-    altura_texto = caixa[3] - caixa[1]
+    largura_texto = (
+        caixa[2] - caixa[0]
+    )
 
-    x = (largura - largura_texto) // 2
-    y = (altura - altura_texto) // 2
+    altura_texto = (
+        caixa[3] - caixa[1]
+    )
+
+    x = (
+        largura - largura_texto
+    ) // 2
+
+    y = (
+        altura - altura_texto
+    ) // 2
 
     desenho.text(
-        (x, y),
+        (
+            x,
+            y
+        ),
         nome_arquivo,
         fill="black",
         font=fonte
     )
 
     if extensao == "png":
+
         imagem.save(
             caminho,
             "PNG"
         )
 
     else:
+
         imagem.save(
             caminho,
             "JPEG",
             quality=90
         )
 
-    tamanho_atual = os.path.getsize(caminho)
-
-    if tamanho_atual < tamanho_bytes:
-        with open(caminho, "ab") as arquivo:
-            arquivo.write(
-                os.urandom(
-                    tamanho_bytes - tamanho_atual
-                )
-            )
+    completar_arquivo(
+        caminho,
+        tamanho_bytes
+    )
 
 
 # ============================================================
@@ -300,6 +475,7 @@ def criar_pdf_com_nome(
     nome_arquivo,
     tamanho_bytes
 ):
+
     texto = (
         nome_arquivo
         .replace("\\", "\\\\")
@@ -319,6 +495,7 @@ def criar_pdf_com_nome(
     )
 
     objetos = [
+
         b"<< /Type /Catalog /Pages 2 0 R >>",
 
         b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
@@ -354,13 +531,18 @@ def criar_pdf_com_nome(
         objetos,
         start=1
     ):
-        offsets.append(len(pdf))
+
+        offsets.append(
+            len(pdf)
+        )
 
         pdf.extend(
             f"{numero} 0 obj\n".encode()
         )
 
-        pdf.extend(objeto)
+        pdf.extend(
+            objeto
+        )
 
         pdf.extend(
             b"\nendobj\n"
@@ -369,7 +551,10 @@ def criar_pdf_com_nome(
     inicio_xref = len(pdf)
 
     pdf.extend(
-        f"xref\n0 {len(objetos) + 1}\n".encode()
+        (
+            f"xref\n"
+            f"0 {len(objetos) + 1}\n"
+        ).encode()
     )
 
     pdf.extend(
@@ -377,6 +562,7 @@ def criar_pdf_com_nome(
     )
 
     for offset in offsets[1:]:
+
         pdf.extend(
             f"{offset:010d} 00000 n \n".encode()
         )
@@ -392,17 +578,51 @@ def criar_pdf_com_nome(
         ).encode()
     )
 
-    with open(caminho, "wb") as arquivo:
-        arquivo.write(pdf)
+    with open(
+        caminho,
+        "wb"
+    ) as arquivo:
 
-        tamanho_atual = arquivo.tell()
+        arquivo.write(
+            pdf
+        )
 
-        if tamanho_atual < tamanho_bytes:
+    completar_arquivo(
+        caminho,
+        tamanho_bytes
+    )
+
+
+# ============================================================
+# BINÁRIO
+# ============================================================
+
+def criar_arquivo_binario(
+    caminho,
+    tamanho_bytes
+):
+
+    restante = tamanho_bytes
+
+    with open(
+        caminho,
+        "wb"
+    ) as arquivo:
+
+        while restante > 0:
+
+            tamanho_bloco = min(
+                TAMANHO_BLOCO,
+                restante
+            )
+
             arquivo.write(
                 os.urandom(
-                    tamanho_bytes - tamanho_atual
+                    tamanho_bloco
                 )
             )
+
+            restante -= tamanho_bloco
 
 
 # ============================================================
@@ -415,11 +635,13 @@ def gerar_arquivo(
     extensao,
     nome_arquivo
 ):
+
     if extensao in (
         "png",
         "jpg",
         "jpeg"
     ):
+
         criar_imagem_com_nome(
             caminho,
             nome_arquivo,
@@ -430,6 +652,7 @@ def gerar_arquivo(
         return
 
     if extensao == "pdf":
+
         criar_pdf_com_nome(
             caminho,
             nome_arquivo,
@@ -438,33 +661,10 @@ def gerar_arquivo(
 
         return
 
-    bloco = os.urandom(
-        min(
-            TAMANHO_BLOCO,
-            tamanho_bytes
-        )
+    criar_arquivo_binario(
+        caminho,
+        tamanho_bytes
     )
-
-    restante = tamanho_bytes
-
-    with open(caminho, "wb") as arquivo:
-        while restante > 0:
-            tamanho_bloco = min(
-                len(bloco),
-                restante
-            )
-
-            if tamanho_bloco == len(bloco):
-                arquivo.write(bloco)
-
-            else:
-                arquivo.write(
-                    os.urandom(
-                        tamanho_bloco
-                    )
-                )
-
-            restante -= tamanho_bloco
 
 
 # ============================================================
@@ -472,11 +672,16 @@ def gerar_arquivo(
 # ============================================================
 
 def selecionar_pasta():
+
     pasta = filedialog.askdirectory(
-        title="Selecione o diretório onde os arquivos serão salvos"
+        title=(
+            "Selecione o diretório "
+            "onde os arquivos serão salvos"
+        )
     )
 
     if pasta:
+
         campo_pasta.delete(
             0,
             tk.END
@@ -497,6 +702,7 @@ def selecionar_pasta():
 # ============================================================
 
 def atualizar_status(mensagem):
+
     label_status.config(
         text=mensagem
     )
@@ -507,7 +713,9 @@ def atualizar_status(mensagem):
 # ============================================================
 
 def alternar_geracao_lote():
+
     if gerar_todas.get():
+
         combo_extensao.configure(
             state="disabled"
         )
@@ -535,6 +743,7 @@ def alternar_geracao_lote():
         )
 
     else:
+
         combo_extensao.configure(
             state="readonly"
         )
@@ -560,17 +769,22 @@ def alternar_geracao_lote():
 # ============================================================
 
 def validar_tamanho():
+
     valor = campo_tamanho.get().strip()
 
     if not valor:
         return False
 
     try:
-        tamanho = float(valor)
+
+        tamanho = float(
+            valor
+        )
 
         return tamanho > 0
 
     except ValueError:
+
         return False
 
 
@@ -579,11 +793,36 @@ def validar_tamanho():
 # ============================================================
 
 def gerar():
-    unidade = combo_unidade.get()
-    valor = campo_tamanho.get().strip()
-    pasta = campo_pasta.get().strip()
 
-    if not unidade:
+    # --------------------------------------------------------
+    # IMPORTANTE:
+    # Captura NOVAMENTE os valores atuais da interface.
+    # Isso evita qualquer valor antigo quando o usuário
+    # estava no modo "todas as extensões".
+    # --------------------------------------------------------
+
+    unidade = (
+        combo_unidade.get()
+        .strip()
+        .upper()
+    )
+
+    valor = (
+        campo_tamanho.get()
+        .strip()
+    )
+
+    pasta = (
+        campo_pasta.get()
+        .strip()
+    )
+
+    # --------------------------------------------------------
+    # UNIDADE
+    # --------------------------------------------------------
+
+    if unidade not in UNIDADES:
+
         messagebox.showwarning(
             "Atenção",
             "Selecione a unidade do tamanho."
@@ -593,7 +832,12 @@ def gerar():
 
         return
 
+    # --------------------------------------------------------
+    # TAMANHO
+    # --------------------------------------------------------
+
     if not valor:
+
         messagebox.showwarning(
             "Atenção",
             "Digite o tamanho do arquivo."
@@ -603,34 +847,69 @@ def gerar():
 
         return
 
-    if not validar_tamanho():
+    try:
+
+        tamanho = float(
+            valor
+        )
+
+    except ValueError:
+
         messagebox.showerror(
             "Valor inválido",
-            "Digite um tamanho numérico maior que zero."
+            "Digite um número válido."
         )
 
         campo_tamanho.focus()
 
         return
 
-    tamanho = float(valor)
+    if tamanho <= 0:
 
-    tamanho_bytes = converter_para_bytes(
-        tamanho,
-        unidade
-    )
-
-    if tamanho_bytes > LIMITE_MAXIMO:
         messagebox.showerror(
-            "Tamanho não permitido",
-            "O tamanho máximo permitido é 10 GB."
+            "Valor inválido",
+            "O tamanho deve ser maior que zero."
         )
 
         campo_tamanho.focus()
 
         return
+
+    # --------------------------------------------------------
+    # CONVERSÃO DEFINITIVA
+    # --------------------------------------------------------
+
+    try:
+
+        tamanho_bytes = converter_para_bytes(
+            tamanho,
+            unidade
+        )
+
+    except ValueError as erro:
+
+        messagebox.showerror(
+            "Erro",
+            str(erro)
+        )
+
+        return
+
+    if tamanho_bytes <= 0:
+
+        messagebox.showerror(
+            "Valor inválido",
+            "O tamanho informado é muito pequeno."
+        )
+
+        return
+
+    # --------------------------------------------------------
+    # PASTA
+    # --------------------------------------------------------
 
     if not pasta:
+
         messagebox.showwarning(
             "Atenção",
             "Selecione uma pasta para salvar os arquivos."
@@ -641,6 +920,7 @@ def gerar():
         return
 
     if not os.path.isdir(pasta):
+
         messagebox.showerror(
             "Pasta inválida",
             "O diretório selecionado não existe."
@@ -648,13 +928,26 @@ def gerar():
 
         return
 
+    # --------------------------------------------------------
+    # EXTENSÕES
+    # --------------------------------------------------------
+
     if gerar_todas.get():
-        extensoes = EXTENSOES
+
+        extensoes = list(
+            EXTENSOES
+        )
 
     else:
-        extensao = combo_extensao.get()
 
-        if not extensao:
+        extensao = (
+            combo_extensao.get()
+            .strip()
+            .lower()
+        )
+
+        if extensao not in EXTENSOES:
+
             messagebox.showwarning(
                 "Atenção",
                 "Selecione uma extensão."
@@ -664,7 +957,13 @@ def gerar():
 
             return
 
-        extensoes = [extensao]
+        extensoes = [
+            extensao
+        ]
+
+    # --------------------------------------------------------
+    # PILLOW
+    # --------------------------------------------------------
 
     if any(
         extensao in (
@@ -677,26 +976,56 @@ def gerar():
 
         messagebox.showerror(
             "Biblioteca necessária",
-            "A biblioteca Pillow não está instalada.\n\n"
-            "Execute no terminal:\n"
-            "py -3.13 -m pip install Pillow"
+            (
+                "A biblioteca Pillow não está instalada.\n\n"
+                "Execute:\n"
+                "py -3.13 -m pip install Pillow"
+            )
         )
 
         return
 
+    # --------------------------------------------------------
+    # INFORMAÇÕES PARA STATUS
+    # --------------------------------------------------------
+
+    tamanho_solicitado = (
+        formatar_tamanho_na_unidade(
+            tamanho_bytes,
+            unidade
+        )
+    )
+
     arquivos = []
 
     atualizar_status(
-        "Gerando arquivo(s)..."
+        (
+            f"Gerando {len(extensoes)} arquivo(s) "
+            f"com {tamanho_solicitado}..."
+        )
     )
 
     janela.update_idletasks()
 
+    # --------------------------------------------------------
+    # GERAÇÃO
+    # --------------------------------------------------------
+
     try:
+
         for extensao in extensoes:
+
+            # O tamanho_bytes usado aqui é EXATAMENTE
+            # o calculado a partir da unidade atual.
+
+            nome_base = gerar_nome_base(
+                extensao,
+                tamanho,
+                unidade
+            )
+
             nome = (
-                f"{gerar_nome_base(extensao, tamanho, unidade)}."
-                f"{extensao}"
+                f"{nome_base}.{extensao}"
             )
 
             caminho = gerar_nome_unico(
@@ -708,6 +1037,13 @@ def gerar():
                 caminho
             )
 
+            atualizar_status(
+                f"Gerando: {nome_final}"
+            )
+
+            janela.update_idletasks()
+
+            # GERAÇÃO REAL
             gerar_arquivo(
                 caminho,
                 tamanho_bytes,
@@ -715,26 +1051,62 @@ def gerar():
                 nome_final
             )
 
+            # ------------------------------------------------
+            # VALIDAÇÃO REAL NO DISCO
+            # ------------------------------------------------
+
+            tamanho_real = os.path.getsize(
+                caminho
+            )
+
+            if tamanho_real != tamanho_bytes:
+
+                raise RuntimeError(
+                    (
+                        f"O arquivo {nome_final} "
+                        f"foi criado com "
+                        f"{tamanho_real} bytes, "
+                        f"mas o esperado era "
+                        f"{tamanho_bytes} bytes."
+                    )
+                )
+
             arquivos.append(
                 nome_final
             )
 
             atualizar_status(
-                f"Gerando: {nome_final}"
+                (
+                    f"Concluído: {nome_final} "
+                    f"({formatar_tamanho_na_unidade(tamanho_real, unidade)})"
+                )
             )
 
             janela.update_idletasks()
 
-        quantidade = len(arquivos)
+        # ----------------------------------------------------
+        # RESULTADO
+        # ----------------------------------------------------
+
+        quantidade = len(
+            arquivos
+        )
 
         atualizar_status(
-            f"✓ {quantidade} arquivo(s) gerado(s) com sucesso."
+            (
+                f"✓ {quantidade} arquivo(s) "
+                "gerado(s) com sucesso."
+            )
         )
 
         if quantidade == 1:
-            lista = f"Arquivo: {arquivos[0]}"
+
+            lista = (
+                f"Arquivo: {arquivos[0]}"
+            )
 
         else:
+
             lista = (
                 "Arquivos gerados:\n\n"
                 + "\n".join(
@@ -745,16 +1117,21 @@ def gerar():
 
         messagebox.showinfo(
             "Arquivos gerados",
-            "Geração concluída com sucesso!\n\n"
-            f"{lista}\n\n"
-            f"Tamanho de cada arquivo: "
-            f"{formatar_tamanho(tamanho_bytes)}\n"
-            f"Local: {pasta}"
+            (
+                "Geração concluída com sucesso!\n\n"
+                f"{lista}\n\n"
+                f"Tamanho solicitado: "
+                f"{tamanho_solicitado}\n"
+                f"Tamanho em bytes: "
+                f"{tamanho_bytes:,}\n"
+                f"Local: {pasta}"
+            )
         )
 
     except (
         OSError,
-        RuntimeError
+        RuntimeError,
+        ValueError
     ) as erro:
 
         atualizar_status(
@@ -763,7 +1140,10 @@ def gerar():
 
         messagebox.showerror(
             "Erro ao gerar arquivo",
-            f"Não foi possível concluir a geração.\n\n{erro}"
+            (
+                "Não foi possível concluir "
+                f"a geração.\n\n{erro}"
+            )
         )
 
 
@@ -772,7 +1152,10 @@ def gerar():
 # ============================================================
 
 def limpar():
-    gerar_todas.set(False)
+
+    gerar_todas.set(
+        False
+    )
 
     combo_extensao.configure(
         state="readonly"
@@ -782,8 +1165,13 @@ def limpar():
         state="normal"
     )
 
-    combo_extensao.set("")
-    combo_unidade.set("")
+    combo_extensao.set(
+        ""
+    )
+
+    combo_unidade.set(
+        ""
+    )
 
     campo_tamanho.delete(
         0,
@@ -812,11 +1200,17 @@ def limpar():
 # ============================================================
 
 def abrir_github():
-    webbrowser.open(GITHUB_URL)
+
+    webbrowser.open(
+        GITHUB_URL
+    )
 
 
 def abrir_linkedin():
-    webbrowser.open(LINKEDIN_URL)
+
+    webbrowser.open(
+        LINKEDIN_URL
+    )
 
 
 # ============================================================
@@ -824,9 +1218,8 @@ def abrir_linkedin():
 # ============================================================
 
 def criar_rodape():
-    y = 615
 
-    # Nome
+    y = 615
 
     fundo_canvas.create_text(
         275,
@@ -837,7 +1230,9 @@ def criar_rodape():
         anchor="center"
     )
 
-    # GitHub
+    # --------------------------------------------------------
+    # GITHUB
+    # --------------------------------------------------------
 
     github_x1 = 425
     github_y1 = 590
@@ -865,7 +1260,9 @@ def criar_rodape():
         tags=("github_text",)
     )
 
-    # Separador
+    # --------------------------------------------------------
+    # SEPARADOR
+    # --------------------------------------------------------
 
     fundo_canvas.create_text(
         565,
@@ -876,7 +1273,9 @@ def criar_rodape():
         anchor="center"
     )
 
-    # LinkedIn
+    # --------------------------------------------------------
+    # LINKEDIN
+    # --------------------------------------------------------
 
     linkedin_x1 = 595
     linkedin_y1 = 590
@@ -904,11 +1303,12 @@ def criar_rodape():
         tags=("linkedin_text",)
     )
 
-    # ========================================================
-    # HOVER GITHUB
-    # ========================================================
+    # --------------------------------------------------------
+    # GITHUB HOVER
+    # --------------------------------------------------------
 
     def github_entrar(event):
+
         fundo_canvas.config(
             cursor="hand2"
         )
@@ -919,6 +1319,7 @@ def criar_rodape():
         )
 
     def github_sair(event):
+
         fundo_canvas.config(
             cursor=""
         )
@@ -964,11 +1365,12 @@ def criar_rodape():
         github_sair
     )
 
-    # ========================================================
-    # HOVER LINKEDIN
-    # ========================================================
+    # --------------------------------------------------------
+    # LINKEDIN HOVER
+    # --------------------------------------------------------
 
     def linkedin_entrar(event):
+
         fundo_canvas.config(
             cursor="hand2"
         )
@@ -979,6 +1381,7 @@ def criar_rodape():
         )
 
     def linkedin_sair(event):
+
         fundo_canvas.config(
             cursor=""
         )
@@ -1030,6 +1433,7 @@ def criar_rodape():
 # ============================================================
 
 def main():
+
     global janela
     global combo_extensao
     global combo_unidade
@@ -1055,17 +1459,29 @@ def main():
         False
     )
 
+    # --------------------------------------------------------
+    # ESTILO
+    # --------------------------------------------------------
+
     configurar_estilo()
 
-    # ========================================================
+    # --------------------------------------------------------
     # ÍCONE
-    # ========================================================
+    # --------------------------------------------------------
 
-    configurar_icone_windows()
+    try:
 
-    # ========================================================
+        aplicar_icone(
+            janela
+        )
+
+    except Exception:
+
+        pass
+
+    # --------------------------------------------------------
     # FUNDO
-    # ========================================================
+    # --------------------------------------------------------
 
     fundo = criar_fundo(
         janela,
@@ -1087,6 +1503,7 @@ def main():
     )
 
     if fundo:
+
         fundo_canvas.create_image(
             0,
             0,
@@ -1096,15 +1513,15 @@ def main():
 
         fundo_canvas.image = fundo
 
-    # ========================================================
+    # --------------------------------------------------------
     # RODAPÉ
-    # ========================================================
+    # --------------------------------------------------------
 
     criar_rodape()
 
-    # ========================================================
-    # PAINEL CENTRAL
-    # ========================================================
+    # --------------------------------------------------------
+    # PAINEL
+    # --------------------------------------------------------
 
     painel = tk.Frame(
         janela,
@@ -1133,9 +1550,9 @@ def main():
         pady=20
     )
 
-    # ========================================================
+    # --------------------------------------------------------
     # CABEÇALHO
-    # ========================================================
+    # --------------------------------------------------------
 
     tk.Label(
         conteudo,
@@ -1161,9 +1578,9 @@ def main():
         pady=(3, 12)
     )
 
-    # ========================================================
-    # CONFIGURAÇÃO
-    # ========================================================
+    # --------------------------------------------------------
+    # SEÇÃO
+    # --------------------------------------------------------
 
     tk.Label(
         conteudo,
@@ -1175,6 +1592,10 @@ def main():
         anchor="w",
         pady=(0, 7)
     )
+
+    # --------------------------------------------------------
+    # CAMPOS
+    # --------------------------------------------------------
 
     frame_campos = tk.Frame(
         conteudo,
@@ -1200,9 +1621,7 @@ def main():
         weight=1
     )
 
-    # ========================================================
     # EXTENSÃO
-    # ========================================================
 
     tk.Label(
         frame_campos,
@@ -1230,9 +1649,7 @@ def main():
         padx=(0, 10)
     )
 
-    # ========================================================
     # UNIDADE
-    # ========================================================
 
     tk.Label(
         frame_campos,
@@ -1260,9 +1677,7 @@ def main():
         padx=(0, 10)
     )
 
-    # ========================================================
     # TAMANHO
-    # ========================================================
 
     tk.Label(
         frame_campos,
@@ -1281,7 +1696,10 @@ def main():
             valor == ""
             or (
                 valor.count(".") <= 1
-                and valor.replace(".", "").isdigit()
+                and valor.replace(
+                    ".",
+                    ""
+                ).isdigit()
             )
         )
     )
@@ -1301,9 +1719,9 @@ def main():
         sticky="ew"
     )
 
-    # ========================================================
-    # LOTE
-    # ========================================================
+    # --------------------------------------------------------
+    # MODO LOTE
+    # --------------------------------------------------------
 
     gerar_todas = tk.BooleanVar(
         value=False
@@ -1330,9 +1748,9 @@ def main():
         pady=(1, 8)
     )
 
-    # ========================================================
+    # --------------------------------------------------------
     # NOME
-    # ========================================================
+    # --------------------------------------------------------
 
     tk.Label(
         conteudo,
@@ -1353,9 +1771,9 @@ def main():
         fill="x"
     )
 
-    # ========================================================
+    # --------------------------------------------------------
     # PASTA
-    # ========================================================
+    # --------------------------------------------------------
 
     tk.Label(
         conteudo,
@@ -1396,9 +1814,9 @@ def main():
         padx=(8, 0)
     )
 
-    # ========================================================
+    # --------------------------------------------------------
     # BOTÕES
-    # ========================================================
+    # --------------------------------------------------------
 
     frame_botoes = tk.Frame(
         conteudo,
@@ -1427,9 +1845,9 @@ def main():
         side="right"
     )
 
-    # ========================================================
+    # --------------------------------------------------------
     # STATUS
-    # ========================================================
+    # --------------------------------------------------------
 
     frame_status = tk.Frame(
         conteudo,
@@ -1442,7 +1860,10 @@ def main():
 
     label_status = tk.Label(
         frame_status,
-        text="Preencha os campos para gerar um arquivo de teste.",
+        text=(
+            "Preencha os campos para gerar "
+            "um arquivo de teste."
+        ),
         font=("Segoe UI", 9),
         fg=COR_TEXTO,
         bg=COR_STATUS,
@@ -1455,9 +1876,9 @@ def main():
         pady=7
     )
 
-    # ========================================================
+    # --------------------------------------------------------
     # EVENTOS
-    # ========================================================
+    # --------------------------------------------------------
 
     combo_extensao.bind(
         "<<ComboboxSelected>>",
@@ -1481,11 +1902,15 @@ def main():
 
     combo_extensao.focus()
 
+    # --------------------------------------------------------
+    # EXECUÇÃO
+    # --------------------------------------------------------
+
     janela.mainloop()
 
 
 # ============================================================
-# EXECUÇÃO
+# EXECUÇÃO PRINCIPAL
 # ============================================================
 
 if __name__ == "__main__":
