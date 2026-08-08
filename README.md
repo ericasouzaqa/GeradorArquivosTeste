@@ -23,10 +23,7 @@ A aplicação permite gerar arquivos de diferentes extensões e tamanhos de form
 - Criação automática do nome do arquivo.
 - Evita sobrescrever arquivos existentes.
 - Seleção do diretório de destino.
-- Limite máximo de geração de 10 GB por arquivo.
-- Geração de imagens com identificação do arquivo.
 - Interface gráfica desktop.
-- Links para GitHub e LinkedIn.
 - Aplicação empacotada como executável para Windows.
 
 ### Formatos disponíveis
