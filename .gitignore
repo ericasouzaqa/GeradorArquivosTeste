@@ -16,3 +16,17 @@ venv/
 
 Thumbs.db
 .DS_Store
+
+# Executáveis gerados
+*.exe
+
+# Arquivos do PyInstaller
+*.spec
+
+# Pastas de build
+build/
+dist/
+
+# Cache do Python
+__pycache__/
+*.pyc
