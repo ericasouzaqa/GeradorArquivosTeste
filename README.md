@@ -31,6 +31,11 @@ A aplicação permite gerar arquivos de diferentes extensões e tamanhos de form
 - PNG
 - JPG
 - JPEG
+- HEIC / HEIF (contêiner para testes, compatível com o padrão do iPhone)
+- WEBP
+- GIF
+- TIFF
+- SVG
 - PDF
 - MP4
 - M4A
@@ -44,6 +49,10 @@ A aplicação permite gerar arquivos de diferentes extensões e tamanhos de form
 - Tkinter
 - Pillow
 - PyInstaller
+
+A geração é local e não depende de APIs, serviços de IA ou conversores externos.
+
+Para os formatos de imagem, o conteúdo base é criado com Pillow e depois preenchido até o tamanho exato solicitado. SVG é gerado como XML válido. HEIC/HEIF recebe a assinatura ISO-BMFF correspondente para uso em massas de testes; a aplicação não requer um codec HEIF externo.
 
 ---
 

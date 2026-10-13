@@ -3,6 +3,8 @@ import sys
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import webbrowser
+import html
+import struct
 
 
 # ============================================================
@@ -38,6 +40,9 @@ from estilo import (
 # ============================================================
 
 EXTENSOES = [
+    "gif",
+    "heic",
+    "heif",
     "jpeg",
     "jpg",
     "m4a",
@@ -45,6 +50,9 @@ EXTENSOES = [
     "ogg",
     "pdf",
     "png",
+    "svg",
+    "tiff",
+    "webp",
 ]
 
 UNIDADES = [
@@ -445,25 +453,71 @@ def criar_imagem_com_nome(
         font=fonte
     )
 
-    if extensao == "png":
+    formatos = {
+        "png": ("PNG", {}),
+        "jpg": ("JPEG", {"quality": 90}),
+        "jpeg": ("JPEG", {"quality": 90}),
+        "webp": ("WEBP", {"quality": 90}),
+        "gif": ("GIF", {}),
+        "tiff": ("TIFF", {}),
+    }
 
-        imagem.save(
-            caminho,
-            "PNG"
-        )
-
-    else:
-
-        imagem.save(
-            caminho,
-            "JPEG",
-            quality=90
-        )
+    formato, opcoes = formatos[extensao]
+    imagem.save(caminho, formato, **opcoes)
 
     completar_arquivo(
         caminho,
         tamanho_bytes
     )
+
+
+def criar_svg_com_nome(caminho, nome_arquivo, tamanho_bytes):
+    """Cria um SVG válido com o nome do arquivo e tamanho exato."""
+
+    texto = html.escape(nome_arquivo)
+    inicio = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<svg xmlns="http://www.w3.org/2000/svg" '
+        'width="1000" height="500" viewBox="0 0 1000 500">'
+        '<rect width="100%" height="100%" fill="white"/>'
+        '<text x="500" y="265" text-anchor="middle" '
+        'font-family="Arial, sans-serif" font-size="48" fill="black">'
+        f'{texto}</text>'
+    ).encode("utf-8")
+    fim = b"</svg>"
+    preenchimento = tamanho_bytes - len(inicio) - len(fim)
+
+    if preenchimento < 0:
+        raise RuntimeError(
+            "O tamanho solicitado é pequeno demais para um SVG válido."
+        )
+
+    with open(caminho, "wb") as arquivo:
+        arquivo.write(inicio)
+        arquivo.write(b" " * preenchimento)
+        arquivo.write(fim)
+
+
+def criar_heif_com_assinatura(caminho, extensao, tamanho_bytes):
+    """Cria um contêiner HEIC/HEIF mínimo para massas de teste.
+
+    A aplicação não depende de codecs externos. O arquivo recebe a assinatura
+    ISO-BMFF correta e o tamanho exato solicitado, como os demais formatos de
+    teste que não possuem encoder local.
+    """
+
+    if tamanho_bytes < 24:
+        raise RuntimeError(
+            "O tamanho solicitado é pequeno demais para um contêiner HEIC/HEIF."
+        )
+
+    marca = b"heic" if extensao == "heic" else b"heif"
+    # ISO-BMFF: tamanho do box + tipo ftyp + marca + versão + marca compatível.
+    cabecalho = struct.pack(">I4s4sI4s", 24, b"ftyp", marca, 0, marca)
+
+    with open(caminho, "wb") as arquivo:
+        arquivo.write(cabecalho)
+        arquivo.write(b"\x00" * (tamanho_bytes - len(cabecalho)))
 
 
 # ============================================================
@@ -639,7 +693,10 @@ def gerar_arquivo(
     if extensao in (
         "png",
         "jpg",
-        "jpeg"
+        "jpeg",
+        "webp",
+        "gif",
+        "tiff"
     ):
 
         criar_imagem_com_nome(
@@ -649,6 +706,14 @@ def gerar_arquivo(
             tamanho_bytes
         )
 
+        return
+
+    if extensao == "svg":
+        criar_svg_com_nome(caminho, nome_arquivo, tamanho_bytes)
+        return
+
+    if extensao in ("heic", "heif"):
+        criar_heif_com_assinatura(caminho, extensao, tamanho_bytes)
         return
 
     if extensao == "pdf":
@@ -969,7 +1034,10 @@ def gerar():
         extensao in (
             "png",
             "jpg",
-            "jpeg"
+            "jpeg",
+            "webp",
+            "gif",
+            "tiff"
         )
         for extensao in extensoes
     ) and not PIL_DISPONIVEL:
@@ -1739,7 +1807,7 @@ def main():
 
     tk.Label(
         conteudo,
-        text="PNG, JPG, JPEG, PDF, MP4, M4A e OGG.",
+        text="PNG, JPG, JPEG, WEBP, GIF, TIFF, SVG, HEIC, HEIF, PDF, MP4, M4A e OGG.",
         font=FONTE_SUBTITULO,
         fg=COR_TEXTO_SECUNDARIO,
         bg=COR_CARD
